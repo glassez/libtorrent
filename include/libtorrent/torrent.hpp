@@ -12,6 +12,7 @@ Copyright (c) 2018, d-komarov
 Copyright (c) 2019, ghbplayer
 Copyright (c) 2020, Paul-Louis Ageneau
 Copyright (c) 2021, AdvenT
+Copyright (c) 2025, Vladimir Golovnev (glassez)
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -51,11 +52,9 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <deque>
 #include <limits> // for numeric_limits
 #include <memory> // for unique_ptr
-
 #include "libtorrent/aux_/disable_warnings_push.hpp"
 #include <boost/logic/tribool.hpp>
 #include "libtorrent/aux_/disable_warnings_pop.hpp"
-
 #include "libtorrent/fwd.hpp"
 #include "libtorrent/optional.hpp"
 #include "libtorrent/torrent_handle.hpp"
@@ -589,6 +588,7 @@ namespace libtorrent {
 		bool is_torrent_paused() const { return m_paused; }
 		void force_recheck();
 		void save_resume_data(resume_data_flags_t flags);
+        void fetch_resume_data(resume_data_flags_t flags, boost::promise<add_torrent_params> promise);
 
 		bool need_save_resume_data(resume_data_flags_t flags) const
 		{

@@ -9,6 +9,7 @@ Copyright (c) 2017, 2020, AllSeeingEyeTolledEweSew
 Copyright (c) 2017, Falcosc
 Copyright (c) 2019, Andrei Kurushin
 Copyright (c) 2019, ghbplayer
+Copyright (c) 2025, Vladimir Golovnev (glassez)
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -47,6 +48,9 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <set>
 #include <functional>
 #include <memory>
+
+#define BOOST_THREAD_PROVIDES_FUTURE
+#include <boost/thread/future.hpp>
 
 #include "libtorrent/aux_/disable_warnings_push.hpp"
 #if TORRENT_ABI_VERSION == 1
@@ -824,6 +828,9 @@ namespace aux {
 		//	report that they don't need to save resume data again, and skipped by
 		//	the initial loop, and thwart the counter otherwise.
 		void save_resume_data(resume_data_flags_t flags = {}) const;
+
+		// Note that only ``save_info_dict`` flag is supported by this function.
+		boost::future<add_torrent_params> fetch_resume_data(resume_data_flags_t flags = {}) const;
 
 		// This function returns true if anything that is stored in the resume
 		// data has changed since the last time resume data was saved.

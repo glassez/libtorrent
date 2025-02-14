@@ -21,6 +21,7 @@ Copyright (c) 2021, AdvenT
 Copyright (c) 2021, Joris CARRIER
 Copyright (c) 2021, thrnz
 Copyright (c) 2024, Elyas EL IDRISSI
+Copyright (c) 2025, Vladimir Golovnev (glassez)
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -9477,6 +9478,13 @@ namespace {
 		add_torrent_params atp;
 		write_resume_data(flags, atp);
 		alerts().emplace_alert<save_resume_data_alert>(std::move(atp), get_handle());
+	}
+
+	void torrent::fetch_resume_data(resume_data_flags_t const flags, boost::promise<add_torrent_params> promise)
+	{
+		add_torrent_params atp;
+		write_resume_data(flags, atp);
+		promise.set_value(std::move(atp));
 	}
 
 	bool torrent::should_check_files() const

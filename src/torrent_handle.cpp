@@ -8,6 +8,7 @@ Copyright (c) 2017, Falcosc
 Copyright (c) 2018, Steven Siloti
 Copyright (c) 2019, Andrei Kurushin
 Copyright (c) 2019, ghbplayer
+Copyright (c) 2025, Vladimir Golovnev (glassez)
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -122,12 +123,12 @@ namespace libtorrent {
 		std::shared_ptr<torrent> t = m_torrent.lock();
 		if (!t) aux::throw_ex<system_error>(errors::invalid_torrent_handle);
 		auto& ses = static_cast<session_impl&>(t->session());
-		dispatch(ses.get_context(), [=,&ses] ()
+		dispatch(ses.get_context(), std::bind([=, &ses](auto&&... args) mutable
 		{
 #ifndef BOOST_NO_EXCEPTIONS
 			try {
 #endif
-				(t.get()->*f)(std::move(a)...);
+				(t.get()->*f)(std::move(args)...);
 #ifndef BOOST_NO_EXCEPTIONS
 			} catch (system_error const& e) {
 				ses.alerts().emplace_alert<torrent_error_alert>(torrent_handle(t)
@@ -140,7 +141,7 @@ namespace libtorrent {
 					, error_code(), "unknown error");
 			}
 #endif
-		} );
+		}, std::forward<Args>(a)...));
 	}
 
 	template<typename Fun, typename... Args>
@@ -394,6 +395,14 @@ namespace libtorrent {
 	void torrent_handle::save_resume_data(resume_data_flags_t f) const
 	{
 		async_call(&torrent::save_resume_data, f);
+	}
+
+    boost::future<add_torrent_params> torrent_handle::fetch_resume_data(resume_data_flags_t flags) const
+	{
+		boost::promise<add_torrent_params> promise;
+		auto future = promise.get_future();
+		async_call(&torrent::fetch_resume_data, flags, std::move(promise));
+		return future;
 	}
 
 	bool torrent_handle::need_save_resume_data() const
