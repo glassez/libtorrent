@@ -367,10 +367,7 @@ namespace libtorrent {
 		, peer_class_set
 		, std::enable_shared_from_this<torrent>
 	{
-		// add_torrent_params may contain large merkle trees that are best
-		// moved. Deleting the const& overload ensures that it's always moved in.
-		torrent(aux::session_interface& ses, bool session_paused, add_torrent_params&& p);
-		torrent(aux::session_interface&, bool, add_torrent_params const& p) = delete;
+		torrent(aux::session_interface& ses, bool session_paused, std::unique_ptr<add_torrent_params> p);
 		~torrent() override;
 
 		// This may be called from multiple threads

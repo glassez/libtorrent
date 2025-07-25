@@ -602,16 +602,13 @@ namespace aux {
 				std::shared_ptr<torrent> const& torrent_ptr, client_data_t userdata);
 #endif
 
-			// the add_torrent_params object must be moved in
-			torrent_handle add_torrent(add_torrent_params&&, error_code& ec);
+			torrent_handle add_torrent(std::unique_ptr<add_torrent_params> params, error_code& ec);
 
 			// second return value is true if the torrent was added and false if an
 			// existing one was found.
 			std::tuple<std::shared_ptr<torrent>, info_hash_t, bool>
-			add_torrent_impl(add_torrent_params&& p, error_code& ec);
-			std::tuple<std::shared_ptr<torrent>, info_hash_t, bool>
-			add_torrent_impl(add_torrent_params const& p, error_code& ec) = delete;
-			void async_add_torrent(add_torrent_params* params);
+			add_torrent_impl(std::unique_ptr<add_torrent_params> params, error_code& ec);
+			void async_add_torrent(std::unique_ptr<add_torrent_params> params);
 
 			void remove_torrent(torrent_handle const& h, remove_flags_t options) override;
 			void remove_torrent_impl(std::shared_ptr<torrent> tptr, remove_flags_t options) override;

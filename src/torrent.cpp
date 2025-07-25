@@ -188,57 +188,57 @@ bool is_downloading_state(int const st)
 	{}
 
 	torrent::torrent(
-		aux::session_interface& ses
-		, bool const session_paused
-		, add_torrent_params&& p)
-		: torrent_hot_members(ses, p, session_paused)
-		, m_total_uploaded(p.total_uploaded)
-		, m_total_downloaded(p.total_downloaded)
+			aux::session_interface& ses
+			, bool const session_paused
+			, std::unique_ptr<add_torrent_params> p)
+		: torrent_hot_members(ses, *p, session_paused)
+		, m_total_uploaded(p->total_uploaded)
+		, m_total_downloaded(p->total_downloaded)
 		, m_tracker_timer(ses.get_context())
 		, m_inactivity_timer(ses.get_context())
-		, m_trackerid(p.trackerid)
-		, m_save_path(complete(p.save_path))
+		, m_trackerid(p->trackerid)
+		, m_save_path(complete(p->save_path))
 		, m_stats_counters(ses.stats_counters())
-		, m_added_time(p.added_time ? p.added_time : aux::posix_time())
-		, m_completed_time(p.completed_time)
-		, m_last_seen_complete(p.last_seen_complete)
-		, m_swarm_last_seen_complete(p.last_seen_complete)
-		, m_info_hash(p.info_hashes)
+		, m_added_time(p->added_time ? p->added_time : aux::posix_time())
+		, m_completed_time(p->completed_time)
+		, m_last_seen_complete(p->last_seen_complete)
+		, m_swarm_last_seen_complete(p->last_seen_complete)
+		, m_info_hash(p->info_hashes)
 		, m_error_file(torrent_status::error_file_none)
 		, m_sequence_number(-1)
 		, m_peer_id(aux::generate_peer_id(settings()))
-		, m_announce_to_trackers(!(p.flags & torrent_flags::paused))
-		, m_announce_to_lsd(!(p.flags & torrent_flags::paused))
+		, m_announce_to_trackers(!(p->flags & torrent_flags::paused))
+		, m_announce_to_lsd(!(p->flags & torrent_flags::paused))
 		, m_has_incoming(false)
 		, m_files_checked(false)
-		, m_storage_mode(p.storage_mode)
+		, m_storage_mode(p->storage_mode)
 		, m_announcing(false)
 		, m_added(false)
-		, m_sequential_download(p.flags & torrent_flags::sequential_download)
+		, m_sequential_download(p->flags & torrent_flags::sequential_download)
 		, m_auto_sequential(false)
 		, m_seed_mode(false)
 #ifndef TORRENT_DISABLE_SUPERSEEDING
-		, m_super_seeding(p.flags & torrent_flags::super_seeding)
+		, m_super_seeding(p->flags & torrent_flags::super_seeding)
 #endif
-		, m_stop_when_ready(p.flags & torrent_flags::stop_when_ready)
-		, m_enable_dht(!bool(p.flags & torrent_flags::disable_dht))
-		, m_enable_lsd(!bool(p.flags & torrent_flags::disable_lsd))
-		, m_i2p(bool(p.flags & torrent_flags::i2p_torrent))
+		, m_stop_when_ready(p->flags & torrent_flags::stop_when_ready)
+		, m_enable_dht(!bool(p->flags & torrent_flags::disable_dht))
+		, m_enable_lsd(!bool(p->flags & torrent_flags::disable_lsd))
+		, m_i2p(bool(p->flags & torrent_flags::i2p_torrent))
 		, m_max_uploads((1 << 24) - 1)
 		, m_num_uploads(0)
-		, m_enable_pex(!bool(p.flags & torrent_flags::disable_pex))
-		, m_apply_ip_filter(p.flags & torrent_flags::apply_ip_filter)
+		, m_enable_pex(!bool(p->flags & torrent_flags::disable_pex))
+		, m_apply_ip_filter(p->flags & torrent_flags::apply_ip_filter)
 		, m_pending_active_change(false)
 		, m_v2_piece_layers_validated(false)
 		, m_connect_boost_counter(static_cast<std::uint8_t>(settings().get_int(settings_pack::torrent_connect_boost)))
 		, m_incomplete(0xffffff)
-		, m_announce_to_dht(!(p.flags & torrent_flags::paused))
+		, m_announce_to_dht(!(p->flags & torrent_flags::paused))
 		, m_ssl_torrent(false)
 		, m_deleted(false)
-		, m_last_download(aux::from_time_t(p.last_download))
-		, m_last_upload(aux::from_time_t(p.last_upload))
-		, m_userdata(p.userdata)
-		, m_auto_managed(p.flags & torrent_flags::auto_managed)
+		, m_last_download(aux::from_time_t(p->last_download))
+		, m_last_upload(aux::from_time_t(p->last_upload))
+		, m_userdata(p->userdata)
+		, m_auto_managed(p->flags & torrent_flags::auto_managed)
 		, m_current_gauge_state(static_cast<std::uint32_t>(no_gauge_state))
 		, m_moving_storage(false)
 		, m_inactive(false)
@@ -248,7 +248,7 @@ bool is_downloading_state(int const st)
 		, m_outstanding_file_priority(false)
 		, m_complete_sent(false)
 	{
-		if (p.flags & torrent_flags::need_save_resume)
+		if (p->flags & torrent_flags::need_save_resume)
 		{
 			m_need_save_resume_data |= torrent_handle::only_if_modified
 				| torrent_handle::if_metadata_changed;
@@ -267,7 +267,7 @@ bool is_downloading_state(int const st)
 		}
 
 		if (!m_torrent_file)
-			m_torrent_file = (p.ti ? p.ti : std::make_shared<torrent_info>(m_info_hash));
+			m_torrent_file = (p->ti ? p->ti : std::make_shared<torrent_info>(m_info_hash));
 
 #if TORRENT_USE_I2P
 		if (m_torrent_file->is_i2p())
@@ -286,7 +286,7 @@ bool is_downloading_state(int const st)
 		// if override web seed flag is set, don't load any web seeds from the
 		// torrent file.
 		std::vector<web_seed_t> ws;
-		if (!(p.flags & torrent_flags::override_web_seeds))
+		if (!(p->flags & torrent_flags::override_web_seeds))
 		{
 			for (auto const& e : m_torrent_file->web_seeds())
 				ws.emplace_back(e);
@@ -296,7 +296,7 @@ bool is_downloading_state(int const st)
 		bool const multi_file = m_torrent_file->is_valid()
 				&& m_torrent_file->num_files() > 1;
 
-		for (auto const& u : p.url_seeds)
+		for (auto const& u : p->url_seeds)
 		{
 			ws.emplace_back(web_seed_t(u, web_seed_entry::url_seed));
 
@@ -307,7 +307,7 @@ bool is_downloading_state(int const st)
 				m_torrent_file->add_url_seed(ws.back().url);
 		}
 
-		for (auto const& e : p.http_seeds)
+		for (auto const& e : p->http_seeds)
 		{
 			ws.emplace_back(e, web_seed_entry::http_seed);
 			if (!m_torrent_file->is_valid())
@@ -320,7 +320,7 @@ bool is_downloading_state(int const st)
 		// --- TRACKERS ---
 
 		// if override trackers flag is set, don't load trackers from torrent file
-		if (!(p.flags & torrent_flags::override_trackers))
+		if (!(p->flags & torrent_flags::override_trackers))
 		{
 			m_trackers.clear();
 			for (auto const& ae : m_torrent_file->trackers())
@@ -328,11 +328,11 @@ bool is_downloading_state(int const st)
 		}
 
 		int tier = 0;
-		auto tier_iter = p.tracker_tiers.begin();
-		for (auto const& url : p.trackers)
+		auto tier_iter = p->tracker_tiers.begin();
+		for (auto const& url : p->trackers)
 		{
 			aux::announce_entry e(url);
-			if (tier_iter != p.tracker_tiers.end())
+			if (tier_iter != p->tracker_tiers.end())
 				tier = *tier_iter++;
 
 			e.fail_limit = 0;
@@ -364,20 +364,20 @@ bool is_downloading_state(int const st)
 			// so assume the seed mode flag is not intended and don't enable it in
 			// that case. Also, if the resume data says we're missing a piece, we
 			// can't be in seed-mode.
-			m_seed_mode = (p.flags & torrent_flags::seed_mode)
-				&& std::find(p.file_priorities.begin(), p.file_priorities.end(), dont_download) == p.file_priorities.end()
-				&& std::find(p.piece_priorities.begin(), p.piece_priorities.end(), dont_download) == p.piece_priorities.end()
-				&& std::find(p.have_pieces.begin(), p.have_pieces.end(), false) == p.have_pieces.end();
+			m_seed_mode = (p->flags & torrent_flags::seed_mode)
+				&& std::find(p->file_priorities.begin(), p->file_priorities.end(), dont_download) == p->file_priorities.end()
+				&& std::find(p->piece_priorities.begin(), p->piece_priorities.end(), dont_download) == p->piece_priorities.end()
+				&& std::find(p->have_pieces.begin(), p->have_pieces.end(), false) == p->have_pieces.end();
 
 			m_connections_initialized = true;
 		}
 		else
 		{
-			if (!p.name.empty()) m_name.reset(new std::string(p.name));
+			if (!p->name.empty()) m_name.reset(new std::string(p->name));
 		}
 
 		TORRENT_ASSERT(is_single_thread());
-		m_file_priority.assign(p.file_priorities.begin(), p.file_priorities.end());
+		m_file_priority.assign(p->file_priorities.begin(), p->file_priorities.end());
 
 		if (m_seed_mode)
 		{
@@ -385,14 +385,14 @@ bool is_downloading_state(int const st)
 			m_verifying.resize(m_torrent_file->num_pieces(), false);
 		}
 
-		m_total_uploaded = p.total_uploaded;
-		m_total_downloaded = p.total_downloaded;
+		m_total_uploaded = p->total_uploaded;
+		m_total_downloaded = p->total_downloaded;
 
 		// the number of seconds this torrent has spent in started, finished and
 		// seeding state so far, respectively.
-		m_active_time = seconds(p.active_time);
-		m_finished_time = seconds(p.finished_time);
-		m_seeding_time = seconds(p.seeding_time);
+		m_active_time = seconds(p->active_time);
+		m_finished_time = seconds(p->finished_time);
+		m_seeding_time = seconds(p->seeding_time);
 
 		if (m_completed_time != 0 && m_completed_time < m_added_time)
 			m_completed_time = m_added_time;
@@ -401,14 +401,14 @@ bool is_downloading_state(int const st)
 
 		if (m_torrent_file->is_valid() && m_torrent_file->info_hashes().has_v2())
 		{
-			if (!p.merkle_trees.empty())
+			if (!p->merkle_trees.empty())
 				load_merkle_trees(
-					std::move(p.merkle_trees)
-					, std::move(p.merkle_tree_mask)
-					, std::move(p.verified_leaf_hashes));
+					std::move(p->merkle_trees)
+					, std::move(p->merkle_tree_mask)
+					, std::move(p->verified_leaf_hashes));
 
 			// we really don't want to store extra copies of the trees
-			TORRENT_ASSERT(p.merkle_trees.empty());
+			TORRENT_ASSERT(p->merkle_trees.empty());
 		}
 
 		if (valid_metadata())
@@ -418,7 +418,7 @@ bool is_downloading_state(int const st)
 		}
 
 		// TODO: 3 we could probably get away with just saving a few fields here
-		m_add_torrent_params = std::make_unique<add_torrent_params>(std::move(p));
+		m_add_torrent_params = std::move(p);
 	}
 
 	void torrent::load_merkle_trees(

@@ -42,7 +42,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "libtorrent/hasher.hpp"
 #include "libtorrent/peer_class.hpp"
 #include "libtorrent/peer_class_type_filter.hpp"
-#include "libtorrent/aux_/scope_end.hpp"
 
 #if TORRENT_ABI_VERSION == 1
 #include "libtorrent/read_resume_data.hpp"
@@ -432,7 +431,7 @@ namespace {
 		handle_backwards_compatible_resume_data(params);
 #endif
 		error_code ec;
-		torrent_handle r = sync_call_ret<torrent_handle>(&session_impl::add_torrent, std::move(params), std::ref(ec));
+		torrent_handle r = sync_call_ret<torrent_handle>(&session_impl::add_torrent, std::make_unique<add_torrent_params>(std::move(params)), std::ref(ec));
 		if (ec) aux::throw_ex<system_error>(ec);
 		return r;
 	}
@@ -465,7 +464,7 @@ namespace {
 #if TORRENT_ABI_VERSION == 1
 		handle_backwards_compatible_resume_data(params);
 #endif
-		return sync_call_ret<torrent_handle>(&session_impl::add_torrent, std::move(params), std::ref(ec));
+		return sync_call_ret<torrent_handle>(&session_impl::add_torrent, std::make_unique<add_torrent_params>(std::move(params)), std::ref(ec));
 	}
 
 	torrent_handle session_handle::add_torrent(add_torrent_params const& params, error_code& ec)
@@ -497,20 +496,13 @@ namespace {
 		if (params.ti)
 			params.ti = std::make_shared<torrent_info>(*params.ti);
 
-		// we cannot capture a unique_ptr into a lambda in c++11, so we use a raw
-		// pointer for now. async_call uses a lambda expression to post the call
-		// to the main thread
-		// TODO: in C++14, use unique_ptr and move it into the lambda
-		auto* p = new add_torrent_params(std::move(params));
-		auto guard = aux::scope_end([p]{ delete p; });
-		p->save_path = complete(p->save_path);
+		params.save_path = complete(params.save_path);
 
 #if TORRENT_ABI_VERSION == 1
-		handle_backwards_compatible_resume_data(*p);
+		handle_backwards_compatible_resume_data(params);
 #endif
 
-		async_call(&session_impl::async_add_torrent, p);
-		guard.disarm();
+		async_call(&session_impl::async_add_torrent, std::make_unique<add_torrent_params>(std::move(params)));
 	}
 
 #ifndef BOOST_NO_EXCEPTIONS

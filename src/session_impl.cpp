@@ -4553,8 +4553,8 @@ namespace {
 #ifndef TORRENT_DISABLE_EXTENSIONS
 		for (auto& e : m_ses_extensions[plugins_all_idx])
 		{
-			add_torrent_params p;
-			if (e->on_unknown_torrent(info_hash, peer_connection_handle(pc->self()), p))
+			auto p = std::make_unique<add_torrent_params>();
+			if (e->on_unknown_torrent(info_hash, peer_connection_handle(pc->self()), *p))
 			{
 				error_code ec;
 				torrent_handle handle = add_torrent(std::move(p), ec);
@@ -4881,11 +4881,10 @@ namespace {
 		return torrent_handle(find_torrent(info_hash));
 	}
 
-	void session_impl::async_add_torrent(add_torrent_params* params)
+	void session_impl::async_add_torrent(std::unique_ptr<add_torrent_params> params)
 	{
-		std::unique_ptr<add_torrent_params> holder(params);
 		error_code ec;
-		add_torrent(std::move(*params), ec);
+		add_torrent(std::move(params), ec);
 	}
 
 #ifndef TORRENT_DISABLE_EXTENSIONS
@@ -4901,7 +4900,7 @@ namespace {
 	}
 #endif
 
-	torrent_handle session_impl::add_torrent(add_torrent_params&& params
+	torrent_handle session_impl::add_torrent(std::unique_ptr<add_torrent_params> params
 		, error_code& ec)
 	{
 		std::shared_ptr<torrent> torrent_ptr;
@@ -4913,19 +4912,19 @@ namespace {
 		// copy the most important fields from params to pass back in the
 		// add_torrent_alert
 		add_torrent_params alert_params;
-		alert_params.flags = params.flags;
-		alert_params.ti = params.ti;
-		alert_params.name = params.name;
-		alert_params.save_path = params.save_path;
-		alert_params.userdata = params.userdata;
-		alert_params.trackerid = params.trackerid;
+		alert_params.flags = params->flags;
+		alert_params.ti = params->ti;
+		alert_params.name = params->name;
+		alert_params.save_path = params->save_path;
+		alert_params.userdata = params->userdata;
+		alert_params.trackerid = params->trackerid;
 
 #ifndef TORRENT_DISABLE_EXTENSIONS
-		auto extensions = std::move(params.extensions);
-		auto const userdata = std::move(params.userdata);
+		auto extensions = std::move(params->extensions);
+		auto const userdata = std::move(params->userdata);
 #endif
 
-		auto const flags = params.flags;
+		auto const flags = params->flags;
 
 		info_hash_t info_hash;
 		bool added;
@@ -4973,7 +4972,7 @@ namespace {
 		TORRENT_ASSERT(info_hash == torrent_ptr->torrent_file().info_hashes());
 		insert_torrent(info_hash, torrent_ptr);
 
-        m_alerts.emplace_alert<add_torrent_alert>(handle, std::move(alert_params), ec);
+		m_alerts.emplace_alert<add_torrent_alert>(handle, std::move(alert_params), ec);
 
 		// once we successfully add the torrent, we can disarm the abort action
 		abort_torrent.disarm();
@@ -5010,51 +5009,51 @@ namespace {
 	}
 
 	std::tuple<std::shared_ptr<torrent>, info_hash_t, bool>
-	session_impl::add_torrent_impl(add_torrent_params&& params, error_code& ec)
+	session_impl::add_torrent_impl(std::unique_ptr<add_torrent_params> params, error_code& ec)
 	{
-		TORRENT_ASSERT(!params.save_path.empty());
+		TORRENT_ASSERT(!params->save_path.empty());
 
 		using ptr_t = std::shared_ptr<torrent>;
 		using ret_t = std::tuple<std::shared_ptr<torrent>, info_hash_t, bool>;
 
 #if TORRENT_ABI_VERSION == 1
-		if (string_begins_no_case("magnet:", params.url.c_str()))
+		if (string_begins_no_case("magnet:", params->url.c_str()))
 		{
-			parse_magnet_uri(params.url, params, ec);
-			if (ec) return ret_t{ptr_t(), params.info_hashes, false};
-			params.url.clear();
+			parse_magnet_uri(params->url, params, ec);
+			if (ec) return ret_t{ptr_t(), params->info_hashes, false};
+			params->url.clear();
 		}
 #endif
 
-		if (params.ti && !params.ti->is_valid())
+		if (params->ti && !params->ti->is_valid())
 		{
 			ec = errors::no_metadata;
-			return ret_t{ptr_t(), params.info_hashes, false};
+			return ret_t{ptr_t(), params->info_hashes, false};
 		}
 
-		if (params.ti && params.ti->is_valid() && params.ti->num_files() == 0)
+		if (params->ti && params->ti->is_valid() && params->ti->num_files() == 0)
 		{
 			ec = errors::no_files_in_torrent;
-			return ret_t{ptr_t(), params.info_hashes, false};
+			return ret_t{ptr_t(), params->info_hashes, false};
 		}
 
-		if (params.ti
-			&& ((params.info_hashes.has_v1() && params.info_hashes.v1 != params.ti->info_hashes().v1)
-				|| (params.info_hashes.has_v2() && params.info_hashes.v2 != params.ti->info_hashes().v2)
+		if (params->ti
+			&& ((params->info_hashes.has_v1() && params->info_hashes.v1 != params->ti->info_hashes().v1)
+				|| (params->info_hashes.has_v2() && params->info_hashes.v2 != params->ti->info_hashes().v2)
 			))
 		{
 			ec = errors::mismatching_info_hash;
-			return ret_t{ptr_t(), params.info_hashes, false};
+			return ret_t{ptr_t(), params->info_hashes, false};
 		}
 
 #ifndef TORRENT_DISABLE_DHT
-		// add params.dht_nodes to the DHT, if enabled
-		for (auto const& n : params.dht_nodes)
+		// add params->dht_nodes to the DHT, if enabled
+		for (auto const& n : params->dht_nodes)
 			add_dht_node_name(n);
 
-		if (params.ti)
+		if (params->ti)
 		{
-			for (auto const& n : params.ti->nodes())
+			for (auto const& n : params->ti->nodes())
 				add_dht_node_name(n);
 		}
 #endif
@@ -5064,35 +5063,35 @@ namespace {
 		if (is_aborted())
 		{
 			ec = errors::session_is_closing;
-			return ret_t{ptr_t(), params.info_hashes, false};
+			return ret_t{ptr_t(), params->info_hashes, false};
 		}
 
 		// figure out the info hash of the torrent and make sure
-		// params.info_hashes is set correctly
-		if (params.ti)
+		// params->info_hashes is set correctly
+		if (params->ti)
 		{
-			params.info_hashes = params.ti->info_hashes();
+			params->info_hashes = params->ti->info_hashes();
 #if TORRENT_ABI_VERSION < 3
-			params.info_hash = params.info_hashes.get_best();
+			params->info_hash = params->info_hashes.get_best();
 #endif
 		}
 
-		if (!params.info_hashes.has_v1() && !params.info_hashes.has_v2())
+		if (!params->info_hashes.has_v1() && !params->info_hashes.has_v2())
 		{
 			ec = errors::missing_info_hash_in_uri;
-			return ret_t{ptr_t(), params.info_hashes, false};
+			return ret_t{ptr_t(), params->info_hashes, false};
 		}
 
 		// is the torrent already active?
-		std::shared_ptr<torrent> torrent_ptr = find_torrent(params.info_hashes).lock();
+		std::shared_ptr<torrent> torrent_ptr = find_torrent(params->info_hashes).lock();
 
 		if (torrent_ptr)
 		{
-			if (!(params.flags & torrent_flags::duplicate_is_error))
-				return ret_t{std::move(torrent_ptr), params.info_hashes, false};
+			if (!(params->flags & torrent_flags::duplicate_is_error))
+				return ret_t{std::move(torrent_ptr), params->info_hashes, false};
 
 			ec = errors::duplicate_torrent;
-			return ret_t{ptr_t(), params.info_hashes, false};
+			return ret_t{ptr_t(), params->info_hashes, false};
 		}
 
 		// make sure we have enough memory in the torrent lists up-front,
@@ -5112,12 +5111,12 @@ namespace {
 		catch (system_error const& e)
 		{
 			ec = e.code();
-			return ret_t{ptr_t(), params.info_hashes, false};
+			return ret_t{ptr_t(), params->info_hashes, false};
 		}
 
 		// it's fine to copy this moved-from info_hash_t object, since its move
 		// construction is just a copy.
-		return ret_t{std::move(torrent_ptr), params.info_hashes, true};
+		return ret_t{std::move(torrent_ptr), params->info_hashes, true};
 	}
 
 	void session_impl::update_outgoing_interfaces()
