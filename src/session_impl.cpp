@@ -4957,9 +4957,6 @@ namespace {
 			return handle;
 		}
 
-		torrent_ptr->set_ip_filter(m_ip_filter);
-		torrent_ptr->start();
-
 #ifndef TORRENT_DISABLE_EXTENSIONS
 		for (auto& ext : extensions)
 		{
@@ -5106,7 +5103,7 @@ namespace {
 
 		try
 		{
-			torrent_ptr = std::make_shared<torrent>(*this, m_paused, std::move(params));
+			torrent_ptr = std::make_shared<torrent>(*this, m_paused, m_ip_filter, std::move(params));
 			torrent_ptr->set_queue_position(m_download_queue.end_index());
 		}
 		catch (system_error const& e)

@@ -369,17 +369,14 @@ namespace libtorrent {
 	{
 		// add_torrent_params may contain large merkle trees that are best
 		// moved. Deleting the const& overload ensures that it's always moved in.
-		torrent(aux::session_interface& ses, bool session_paused, add_torrent_params&& p);
-		torrent(aux::session_interface&, bool, add_torrent_params const& p) = delete;
+        torrent(aux::session_interface& ses, bool session_paused, std::shared_ptr<const ip_filter> ipf, add_torrent_params&& p);
+        torrent(aux::session_interface&, bool, std::shared_ptr<const ip_filter>, add_torrent_params const&) = delete;
 		~torrent() override;
 
 		// This may be called from multiple threads
 		info_hash_t const& info_hash() const { return m_info_hash; }
 
 		bool is_deleted() const { return m_deleted; }
-
-		// starts the announce timer
-		void start();
 
 		void added()
 		{
@@ -442,7 +439,7 @@ namespace libtorrent {
 		// connections.
 		bool is_self_connection(peer_id const& pid) const;
 
-		void on_resume_data_checked(status_t status, storage_error const& error);
+        void on_resume_data_checked(std::shared_ptr<add_torrent_params> atp, status_t status, storage_error const& error);
 		void on_force_recheck(status_t status, storage_error const& error);
 		void on_piece_hashed(aux::vector<sha256_hash> block_hashes
 			, piece_index_t piece, sha1_hash const& piece_hash
@@ -1271,7 +1268,10 @@ namespace libtorrent {
 
 	private:
 
-		void on_exception(std::exception const& e);
+        // starts the announce timer
+        void start(add_torrent_params const& p);
+
+        void on_exception(std::exception const& e);
 		void on_error(error_code const& ec);
 
 		// trigger deferred disconnection of peers
@@ -1452,7 +1452,7 @@ namespace libtorrent {
 		// used if there is any resume data. Some of the information from the
 		// add_torrent_params struct are needed later in the torrent object's life
 		// cycle, and not in the constructor. So we need to save if away here
-		std::unique_ptr<add_torrent_params> m_add_torrent_params;
+        std::shared_ptr<add_torrent_params> m_add_torrent_params;
 
 		// if the torrent is started without metadata, it may
 		// still be given a name until the metadata is received
